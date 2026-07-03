@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
-import { login } from '../utils/authService'
+import api, { setToken } from '../utils/api'
 import { useApp } from '../context/AppContext'
 
 export default function LoginPage() {
@@ -10,21 +10,21 @@ export default function LoginPage() {
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault()
     setError('')
     setLoading(true)
 
-    const result = login(form.email, form.password)
-    setTimeout(() => {
+    try {
+      const { token, user } = await api.auth.login(form.email, form.password)
+      setToken(token)
+      dispatch({ type: 'LOGIN', payload: user })
+      navigate('/')
+    } catch (err) {
+      setError(err.message)
+    } finally {
       setLoading(false)
-      if (result.success) {
-        dispatch({ type: 'LOGIN', payload: result.user })
-        navigate('/')
-      } else {
-        setError(result.error)
-      }
-    }, 600)
+    }
   }
 
   return (

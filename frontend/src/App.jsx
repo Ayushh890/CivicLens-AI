@@ -27,6 +27,18 @@ function PublicOnlyRoute({ children }) {
 export default function App() {
   const { state } = useApp()
 
+  if (state.authLoading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-surface-50 via-white to-civic-50/30">
+        <div className="text-center animate-fade-in">
+          <span className="text-5xl mb-4 inline-block animate-bounce-in">🏙️</span>
+          <h1 className="text-2xl font-black text-surface-900 mb-2">CivicLens <span className="gradient-text">AI</span></h1>
+          <span className="w-6 h-6 border-2 border-civic-200 border-t-civic-500 rounded-full animate-spin inline-block mt-4" />
+        </div>
+      </div>
+    )
+  }
+
   if (!state.isAuthenticated) {
     return (
       <Routes>

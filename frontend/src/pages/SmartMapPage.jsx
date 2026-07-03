@@ -1,25 +1,32 @@
-import { useState, useMemo } from 'react'
+import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useApp } from '../context/AppContext'
 import MapView from '../components/MapView'
 import FilterBar from '../components/FilterBar'
 import SeverityBadge from '../components/SeverityBadge'
-import { ISSUE_TYPES, STATUSES, getSeverityLevel } from '../utils/constants'
+import { ISSUE_TYPES, STATUSES } from '../utils/constants'
+import api from '../utils/api'
 
 export default function SmartMapPage() {
   const { state } = useApp()
   const navigate = useNavigate()
   const [selected, setSelected] = useState(null)
+  const [reports, setReports] = useState([])
+  const [loading, setLoading] = useState(true)
 
-  const filtered = useMemo(() => {
-    return state.reports.filter(r => {
-      if (state.filters.type && r.issueType !== state.filters.type) return false
-      if (state.filters.status && r.status !== state.filters.status) return false
-      if (state.filters.ward && r.ward !== state.filters.ward) return false
-      if (state.filters.severity && getSeverityLevel(r.severityScore) !== state.filters.severity) return false
-      return true
-    })
-  }, [state.reports, state.filters])
+  useEffect(() => {
+    setLoading(true)
+    const filters = {}
+    if (state.filters.type) filters.type = state.filters.type
+    if (state.filters.status) filters.status = state.filters.status
+    if (state.filters.ward) filters.ward = state.filters.ward
+    if (state.filters.severity) filters.severity = state.filters.severity
+
+    api.reports.list(filters)
+      .then(setReports)
+      .catch(() => setReports([]))
+      .finally(() => setLoading(false))
+  }, [state.filters])
 
   return (
     <div className="space-y-5 animate-fade-in">
@@ -29,14 +36,14 @@ export default function SmartMapPage() {
           <p className="text-sm text-surface-500">All civic issues plotted by severity</p>
         </div>
         <span className="px-4 py-2 bg-civic-50 text-civic-700 rounded-full text-sm font-semibold border border-civic-200">
-          {filtered.length} reports
+          {reports.length} reports
         </span>
       </div>
 
       <FilterBar />
 
       <div className="rounded-2xl overflow-hidden border border-surface-200 shadow-xl shadow-surface-200/50 animate-scale-in">
-        <MapView reports={filtered} height="600px" onMarkerClick={setSelected} />
+        <MapView reports={reports} height="600px" onMarkerClick={setSelected} />
       </div>
 
       {selected && (

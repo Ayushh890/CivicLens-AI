@@ -1,48 +1,76 @@
-import { useMemo } from 'react'
+import { useState, useEffect } from 'react'
 import { useApp } from '../context/AppContext'
 import StatsCard from '../components/StatsCard'
 import PredictionAlert from '../components/PredictionAlert'
 import MapView from '../components/MapView'
-import { ISSUE_TYPES, DEPARTMENTS, ISSUE_TO_DEPARTMENT } from '../utils/constants'
+import { ISSUE_TYPES, DEPARTMENTS } from '../utils/constants'
+import { detectPatterns } from '../utils/predictionEngine'
+import api from '../utils/api'
 
 export default function DashboardPage() {
   const { state } = useApp()
-  const { reports } = state
+  const [stats, setStats] = useState(null)
+  const [reports, setReports] = useState([])
+  const [predictions, setPredictions] = useState([])
+  const [loading, setLoading] = useState(true)
+  const [exporting, setExporting] = useState(false)
 
-  const stats = useMemo(() => {
-    const total = reports.length
-    const submitted = reports.filter(r => r.status === 'submitted').length
-    const inProgress = reports.filter(r => ['verified', 'assigned', 'in_progress'].includes(r.status)).length
-    const resolved = reports.filter(r => r.status === 'resolved').length
-    const avgSeverity = total ? Math.round(reports.reduce((s, r) => s + r.severityScore, 0) / total) : 0
+  useEffect(() => {
+    Promise.all([api.stats(), api.reports.list()])
+      .then(([s, r]) => {
+        setStats(s)
+        setReports(r)
+        setPredictions(detectPatterns(r))
+      })
+      .catch(() => {})
+      .finally(() => setLoading(false))
+  }, [])
 
-    const byType = {}
-    reports.forEach(r => { byType[r.issueType] = (byType[r.issueType] || 0) + 1 })
-    const typeRanking = Object.entries(byType).sort((a, b) => b[1] - a[1])
+  const handleExport = async () => {
+    setExporting(true)
+    try {
+      const csv = await api.reports.export()
+      const blob = new Blob([csv], { type: 'text/csv' })
+      const url = URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.href = url
+      a.download = 'civiclens_reports.csv'
+      a.click()
+      URL.revokeObjectURL(url)
+    } catch (err) {
+      alert(err.message || 'Export failed')
+    } finally {
+      setExporting(false)
+    }
+  }
 
-    const byDept = {}
-    reports.forEach(r => {
-      const d = ISSUE_TO_DEPARTMENT[r.issueType] || 'municipal'
-      byDept[d] = (byDept[d] || 0) + 1
-    })
+  if (loading) {
+    return (
+      <div className="text-center py-20 animate-fade-in">
+        <span className="w-8 h-8 border-3 border-civic-200 border-t-civic-500 rounded-full animate-spin inline-block" />
+        <p className="text-surface-500 mt-3 font-medium">Loading dashboard...</p>
+      </div>
+    )
+  }
 
-    const byWard = {}
-    reports.forEach(r => { if (r.ward) byWard[r.ward] = (byWard[r.ward] || 0) + 1 })
-    const wardRanking = Object.entries(byWard).sort((a, b) => b[1] - a[1])
+  if (!stats) return null
 
-    const resolutionRate = total ? Math.round((resolved / total) * 100) : 0
-
-    return { total, submitted, inProgress, resolved, avgSeverity, typeRanking, byDept, wardRanking, resolutionRate }
-  }, [reports])
-
-  const maxTypeCount = stats.typeRanking.length ? stats.typeRanking[0][1] : 1
-  const maxWardCount = stats.wardRanking.length ? stats.wardRanking[0][1] : 1
+  const typeRanking = Object.entries(stats.byType || {}).sort((a, b) => b[1] - a[1])
+  const wardRanking = Object.entries(stats.byWard || {}).sort((a, b) => b[1] - a[1])
+  const maxTypeCount = typeRanking.length ? typeRanking[0][1] : 1
+  const maxWardCount = wardRanking.length ? wardRanking[0][1] : 1
 
   return (
     <div className="space-y-6 animate-fade-in">
-      <div>
-        <h1 className="text-2xl font-bold text-surface-800">Municipal Dashboard</h1>
-        <p className="text-sm text-surface-500">Real-time analytics and insights</p>
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-2xl font-bold text-surface-800">Municipal Dashboard</h1>
+          <p className="text-sm text-surface-500">Real-time analytics and insights</p>
+        </div>
+        <button onClick={handleExport} disabled={exporting}
+          className="px-5 py-2.5 bg-emerald-50 border border-emerald-200 text-emerald-700 rounded-xl text-sm font-semibold hover:bg-emerald-100 transition-colors disabled:opacity-60">
+          {exporting ? 'Exporting...' : '📥 Export CSV'}
+        </button>
       </div>
 
       <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
@@ -54,13 +82,13 @@ export default function DashboardPage() {
         <StatsCard icon="📈" label="Resolution" value={`${stats.resolutionRate}%`} color="text-civic-400" />
       </div>
 
-      {state.predictions.length > 0 && (
+      {predictions.length > 0 && (
         <section>
           <h2 className="text-lg font-bold text-surface-800 mb-3 flex items-center gap-2">
             <span className="animate-float">⚠️</span> Prediction Alerts
           </h2>
           <div className="space-y-3">
-            {state.predictions.map((p, i) => <PredictionAlert key={i} prediction={p} />)}
+            {predictions.map((p, i) => <PredictionAlert key={i} prediction={p} />)}
           </div>
         </section>
       )}
@@ -69,10 +97,10 @@ export default function DashboardPage() {
         <div className="glass-card p-6">
           <h3 className="text-sm font-bold text-surface-800 mb-5">Issues by Type</h3>
           <div className="space-y-3">
-            {stats.typeRanking.map(([type, count], i) => (
+            {typeRanking.map(([type, count], i) => (
               <div key={type} className="flex items-center gap-3 animate-fade-in-up" style={{ animationDelay: `${i * 0.05}s` }}>
                 <span className="text-lg w-8">{ISSUE_TYPES[type]?.icon}</span>
-                <span className="text-xs text-surface-500 w-28 truncate font-medium">{ISSUE_TYPES[type]?.label}</span>
+                <span className="text-xs text-surface-500 w-28 truncate font-medium">{ISSUE_TYPES[type]?.label || type}</span>
                 <div className="flex-1 bg-surface-100 rounded-full h-3 overflow-hidden">
                   <div className="h-full bg-gradient-to-r from-civic-400 to-emerald-400 rounded-full transition-all duration-700"
                     style={{ width: `${(count / maxTypeCount) * 100}%` }} />
@@ -86,7 +114,7 @@ export default function DashboardPage() {
         <div className="glass-card p-6">
           <h3 className="text-sm font-bold text-surface-800 mb-5">Issues by Ward</h3>
           <div className="space-y-3">
-            {stats.wardRanking.map(([ward, count], i) => (
+            {wardRanking.map(([ward, count], i) => (
               <div key={ward} className="flex items-center gap-3 animate-fade-in-up" style={{ animationDelay: `${i * 0.05}s` }}>
                 <span className="text-xs text-surface-500 w-48 truncate font-medium">{ward}</span>
                 <div className="flex-1 bg-surface-100 rounded-full h-3 overflow-hidden">
@@ -113,9 +141,9 @@ export default function DashboardPage() {
               </tr>
             </thead>
             <tbody>
-              {Object.entries(stats.byDept).sort((a, b) => b[1] - a[1]).map(([key, count]) => (
+              {Object.entries(stats.byDept || {}).sort((a, b) => b[1] - a[1]).map(([key, count]) => (
                 <tr key={key} className="border-b border-surface-100 hover:bg-civic-50/30 transition-colors">
-                  <td className="py-3 pr-4 text-surface-700 font-medium">{DEPARTMENTS[key]?.name}</td>
+                  <td className="py-3 pr-4 text-surface-700 font-medium">{DEPARTMENTS[key]?.name || key}</td>
                   <td className="py-3 pr-4">
                     <span className="px-3 py-1 bg-civic-50 text-civic-700 rounded-full text-xs font-bold border border-civic-200">{count}</span>
                   </td>

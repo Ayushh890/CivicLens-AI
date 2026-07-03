@@ -1,8 +1,11 @@
+import { useState, useEffect } from 'react'
 import { Link } from 'react-router-dom'
 import { useApp } from '../context/AppContext'
 import StatsCard from '../components/StatsCard'
 import PredictionAlert from '../components/PredictionAlert'
 import ReportCard from '../components/ReportCard'
+import { detectPatterns } from '../utils/predictionEngine'
+import api from '../utils/api'
 
 const FEATURES = [
   { icon: '🤖', title: 'AI Classification', desc: 'Instantly classifies and routes your complaint to the right department', color: 'from-violet-50 to-purple-50 border-violet-200' },
@@ -22,12 +25,25 @@ const STEPS = [
 
 export default function HomePage() {
   const { state } = useApp()
+  const [reports, setReports] = useState([])
+  const [predictions, setPredictions] = useState([])
+  const [statsData, setStatsData] = useState({ total: 0, pending: 0, inProgress: 0, resolved: 0 })
 
-  const total = state.reports.length
-  const pending = state.reports.filter(r => r.status === 'submitted').length
-  const inProgress = state.reports.filter(r => ['verified', 'assigned', 'in_progress'].includes(r.status)).length
-  const resolved = state.reports.filter(r => r.status === 'resolved').length
-  const recent = [...state.reports].sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt)).slice(0, 5)
+  useEffect(() => {
+    api.reports.list()
+      .then(data => {
+        setReports(data)
+        setPredictions(detectPatterns(data))
+        const total = data.length
+        const pending = data.filter(r => r.status === 'submitted').length
+        const inProgress = data.filter(r => ['verified', 'assigned', 'in_progress'].includes(r.status)).length
+        const resolved = data.filter(r => r.status === 'resolved').length
+        setStatsData({ total, pending, inProgress, resolved })
+      })
+      .catch(() => {})
+  }, [])
+
+  const recent = [...reports].sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt)).slice(0, 5)
 
   return (
     <div className="space-y-12">
@@ -62,19 +78,19 @@ export default function HomePage() {
       </section>
 
       <section className="grid grid-cols-2 md:grid-cols-4 gap-4 animate-fade-in-up" style={{ animationDelay: '0.2s' }}>
-        <StatsCard icon="📋" label="Total Reports" value={total} />
-        <StatsCard icon="🔴" label="Pending" value={pending} color="text-red-400" />
-        <StatsCard icon="🔧" label="In Progress" value={inProgress} color="text-orange-400" />
-        <StatsCard icon="✅" label="Resolved" value={resolved} color="text-green-400" />
+        <StatsCard icon="📋" label="Total Reports" value={statsData.total} />
+        <StatsCard icon="🔴" label="Pending" value={statsData.pending} color="text-red-400" />
+        <StatsCard icon="🔧" label="In Progress" value={statsData.inProgress} color="text-orange-400" />
+        <StatsCard icon="✅" label="Resolved" value={statsData.resolved} color="text-green-400" />
       </section>
 
-      {state.predictions.length > 0 && (
+      {predictions.length > 0 && (
         <section className="animate-fade-in-up" style={{ animationDelay: '0.3s' }}>
           <h2 className="text-xl font-bold text-surface-800 mb-4 flex items-center gap-2">
             <span className="animate-float">⚠️</span> Prediction Alerts
           </h2>
           <div className="space-y-3">
-            {state.predictions.map((p, i) => <PredictionAlert key={i} prediction={p} />)}
+            {predictions.map((p, i) => <PredictionAlert key={i} prediction={p} />)}
           </div>
         </section>
       )}
@@ -93,21 +109,23 @@ export default function HomePage() {
         </div>
       </section>
 
-      <section>
-        <div className="flex items-center justify-between mb-4">
-          <h2 className="text-xl font-bold text-surface-800">Recent Reports</h2>
-          <Link to="/my-reports" className="text-sm text-civic-600 hover:text-civic-700 font-semibold transition-colors">
-            View All &rarr;
-          </Link>
-        </div>
-        <div className="space-y-3">
-          {recent.map((r, i) => (
-            <div key={r.id} className="animate-fade-in-up" style={{ animationDelay: `${i * 0.08}s` }}>
-              <ReportCard report={r} />
-            </div>
-          ))}
-        </div>
-      </section>
+      {recent.length > 0 && (
+        <section>
+          <div className="flex items-center justify-between mb-4">
+            <h2 className="text-xl font-bold text-surface-800">Recent Reports</h2>
+            <Link to="/my-reports" className="text-sm text-civic-600 hover:text-civic-700 font-semibold transition-colors">
+              View All &rarr;
+            </Link>
+          </div>
+          <div className="space-y-3">
+            {recent.map((r, i) => (
+              <div key={r.id} className="animate-fade-in-up" style={{ animationDelay: `${i * 0.08}s` }}>
+                <ReportCard report={r} />
+              </div>
+            ))}
+          </div>
+        </section>
+      )}
 
       <section className="glass-card p-10 text-center">
         <h3 className="text-2xl font-bold text-surface-800 mb-8">How It Works</h3>

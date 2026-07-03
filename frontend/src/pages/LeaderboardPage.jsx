@@ -1,7 +1,6 @@
-import { useMemo } from 'react'
-import { useApp } from '../context/AppContext'
-import { calculateTrustScore } from '../utils/trustScoreCalculator'
+import { useState, useEffect } from 'react'
 import TrustBadge from '../components/TrustBadge'
+import api from '../utils/api'
 
 const RANK_STYLES = {
   0: { bg: 'from-yellow-50 to-amber-50', border: 'border-yellow-200', badge: 'text-yellow-500', medal: '🥇' },
@@ -12,17 +11,24 @@ const RANK_STYLES = {
 const BAR_MAXES = { filed: 30, verified: 30, resolved: 20, consistency: 10, age: 10 }
 
 export default function LeaderboardPage() {
-  const { state } = useApp()
+  const [leaderboard, setLeaderboard] = useState([])
+  const [loading, setLoading] = useState(true)
 
-  const leaderboard = useMemo(() => {
-    const citizens = {}
-    state.reports.forEach(r => {
-      if (!citizens[r.citizenId]) citizens[r.citizenId] = { id: r.citizenId, name: r.citizenName }
-    })
-    return Object.values(citizens)
-      .map(c => ({ ...c, ...calculateTrustScore(c.id, state.reports) }))
-      .sort((a, b) => b.score - a.score)
-  }, [state.reports])
+  useEffect(() => {
+    api.leaderboard()
+      .then(setLeaderboard)
+      .catch(() => setLeaderboard([]))
+      .finally(() => setLoading(false))
+  }, [])
+
+  if (loading) {
+    return (
+      <div className="text-center py-20 animate-fade-in">
+        <span className="w-8 h-8 border-3 border-civic-200 border-t-civic-500 rounded-full animate-spin inline-block" />
+        <p className="text-surface-500 mt-3 font-medium">Loading leaderboard...</p>
+      </div>
+    )
+  }
 
   return (
     <div className="max-w-3xl mx-auto space-y-6 animate-fade-in">

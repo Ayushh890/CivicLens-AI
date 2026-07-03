@@ -1,60 +1,26 @@
 import { createContext, useContext, useReducer, useEffect } from 'react'
-import { generateMockReports } from '../utils/mockData'
-import { detectPatterns } from '../utils/predictionEngine'
-import { getSession, logout as authLogout } from '../utils/authService'
+import api, { setToken, clearToken } from '../utils/api'
 
 const AppContext = createContext(null)
 
-function loadState() {
-  const session = getSession()
-
-  try {
-    const saved = localStorage.getItem('civiclens_state')
-    if (saved) {
-      const parsed = JSON.parse(saved)
-      return {
-        ...initialState,
-        ...parsed,
-        currentUser: session,
-        isAuthenticated: !!session,
-        predictions: detectPatterns(parsed.reports || []),
-      }
-    }
-  } catch {}
-
-  const reports = generateMockReports()
-  return {
-    ...initialState,
-    reports,
-    currentUser: session,
-    isAuthenticated: !!session,
-    predictions: detectPatterns(reports),
-  }
-}
-
 const initialState = {
-  reports: [],
   currentUser: null,
   isAuthenticated: false,
+  authLoading: true,
   filters: { type: '', severity: '', status: '', ward: '' },
-  predictions: [],
   notification: null,
 }
 
 function appReducer(state, action) {
   switch (action.type) {
     case 'LOGIN':
-      return { ...state, currentUser: action.payload, isAuthenticated: true }
+      return { ...state, currentUser: action.payload, isAuthenticated: true, authLoading: false }
     case 'LOGOUT': {
-      authLogout()
-      return { ...state, currentUser: null, isAuthenticated: false }
+      clearToken()
+      return { ...initialState, authLoading: false }
     }
-    case 'ADD_REPORT':
-      return { ...state, reports: [action.payload, ...state.reports], predictions: detectPatterns([action.payload, ...state.reports]) }
-    case 'UPDATE_REPORT': {
-      const reports = state.reports.map(r => r.id === action.payload.id ? { ...r, ...action.payload } : r)
-      return { ...state, reports }
-    }
+    case 'AUTH_LOADED':
+      return { ...state, authLoading: false }
     case 'SET_FILTERS':
       return { ...state, filters: { ...state.filters, ...action.payload } }
     case 'CLEAR_FILTERS':
@@ -69,12 +35,21 @@ function appReducer(state, action) {
 }
 
 export function AppProvider({ children }) {
-  const [state, dispatch] = useReducer(appReducer, null, loadState)
+  const [state, dispatch] = useReducer(appReducer, initialState)
 
   useEffect(() => {
-    const { predictions, notification, isAuthenticated, currentUser, ...toSave } = state
-    localStorage.setItem('civiclens_state', JSON.stringify(toSave))
-  }, [state])
+    const token = localStorage.getItem('civiclens_token')
+    if (!token) {
+      dispatch({ type: 'AUTH_LOADED' })
+      return
+    }
+    api.auth.me()
+      .then(user => dispatch({ type: 'LOGIN', payload: user }))
+      .catch(() => {
+        clearToken()
+        dispatch({ type: 'AUTH_LOADED' })
+      })
+  }, [])
 
   return <AppContext.Provider value={{ state, dispatch }}>{children}</AppContext.Provider>
 }

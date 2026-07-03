@@ -1,7 +1,9 @@
 import { useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
-import { register, isValidPincode } from '../utils/authService'
+import api, { setToken } from '../utils/api'
 import { useApp } from '../context/AppContext'
+
+const VALID_PINCODES = Array.from({ length: 96 }, (_, i) => String(110001 + i))
 
 export default function RegisterPage() {
   const navigate = useNavigate()
@@ -17,13 +19,13 @@ export default function RegisterPage() {
   const handlePincodeChange = (value) => {
     setForm(f => ({ ...f, pincode: value }))
     if (value.length === 6) {
-      setPincodeValid(isValidPincode(value))
+      setPincodeValid(VALID_PINCODES.includes(value))
     } else {
       setPincodeValid(null)
     }
   }
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault()
     setError('')
 
@@ -33,24 +35,23 @@ export default function RegisterPage() {
     }
 
     setLoading(true)
-    const result = register({
-      name: form.name,
-      email: form.email,
-      password: form.password,
-      pincode: form.pincode,
-      role: form.role,
-      adminCode: form.adminCode,
-    })
-
-    setTimeout(() => {
+    try {
+      const { token, user } = await api.auth.register({
+        name: form.name,
+        email: form.email,
+        password: form.password,
+        pincode: form.pincode,
+        role: form.role,
+        adminCode: form.adminCode || undefined,
+      })
+      setToken(token)
+      dispatch({ type: 'LOGIN', payload: user })
+      navigate('/')
+    } catch (err) {
+      setError(err.message)
+    } finally {
       setLoading(false)
-      if (result.success) {
-        dispatch({ type: 'LOGIN', payload: result.user })
-        navigate('/')
-      } else {
-        setError(result.error)
-      }
-    }, 800)
+    }
   }
 
   return (

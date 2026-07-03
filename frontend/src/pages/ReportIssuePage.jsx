@@ -2,18 +2,18 @@ import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useApp } from '../context/AppContext'
 import { analyzeIssue } from '../utils/aiAnalyzer'
-import { routeToDepartment } from '../utils/departmentRouter'
 import { findDuplicates } from '../utils/duplicateDetector'
 import useGeolocation from '../hooks/useGeolocation'
 import PhotoUpload from '../components/PhotoUpload'
 import VoiceInput from '../components/VoiceInput'
 import AIAnalysisPanel from '../components/AIAnalysisPanel'
 import { WARDS } from '../utils/constants'
+import api from '../utils/api'
 
 const STEPS = ['Describe', 'Location', 'AI Analysis', 'Submit']
 
 export default function ReportIssuePage() {
-  const { state, dispatch } = useApp()
+  const { state } = useApp()
   const navigate = useNavigate()
   const { position } = useGeolocation()
   const [step, setStep] = useState(0)
@@ -21,10 +21,15 @@ export default function ReportIssuePage() {
   const [analysis, setAnalysis] = useState(null)
   const [duplicates, setDuplicates] = useState([])
   const [submitting, setSubmitting] = useState(false)
+  const [existingReports, setExistingReports] = useState([])
 
   useEffect(() => {
     if (position) setForm(f => ({ ...f, latitude: position.lat, longitude: position.lng }))
   }, [position])
+
+  useEffect(() => {
+    api.reports.list().then(setExistingReports).catch(() => {})
+  }, [])
 
   const nextStep = () => {
     if (step === 0 && !form.description.trim()) return
@@ -36,42 +41,31 @@ export default function ReportIssuePage() {
     if (step === 1) {
       const dupes = findDuplicates(
         { latitude: form.latitude, longitude: form.longitude, issueType: analysis?.issueType },
-        state.reports
+        existingReports
       )
       setDuplicates(dupes)
     }
     setStep(s => Math.min(s + 1, 3))
   }
 
-  const submit = () => {
+  const submit = async () => {
     if (submitting) return
     setSubmitting(true)
-    const dept = routeToDepartment(analysis?.issueType)
-    const report = {
-      id: `RPT-${String(state.reports.length + 1).padStart(4, '0')}`,
-      title: form.title || analysis?.suggestedTitle || 'Issue Report',
-      description: form.description,
-      issueType: analysis?.issueType || 'road_damage',
-      severityScore: analysis?.severity?.score || 30,
-      severityLevel: analysis?.severity?.level || 'medium',
-      reasoning: analysis?.reasoning || '',
-      department: dept?.key || 'municipal',
-      status: 'submitted',
-      latitude: form.latitude || 28.6139,
-      longitude: form.longitude || 77.2090,
-      address: form.address || 'New Delhi',
-      ward: form.ward || 'Ward 1 - Connaught Place',
-      citizenId: state.currentUser.id,
-      citizenName: state.currentUser.name,
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
-      resolvedAt: null,
-      estimatedResponse: dept?.estimatedResponse || '3-5 days',
-      statusHistory: [{ status: 'submitted', timestamp: new Date().toISOString(), note: 'Report submitted' }],
-      photoData: form.photo,
+    try {
+      const report = await api.reports.create({
+        title: form.title || analysis?.suggestedTitle || 'Issue Report',
+        description: form.description,
+        latitude: form.latitude || 28.6139,
+        longitude: form.longitude || 77.2090,
+        address: form.address || 'New Delhi',
+        ward: form.ward || 'Ward 1 - Connaught Place',
+        photoData: form.photo || null,
+      })
+      navigate(`/report/${report.id}`)
+    } catch (err) {
+      setSubmitting(false)
+      alert(err.message || 'Failed to submit report')
     }
-    dispatch({ type: 'ADD_REPORT', payload: report })
-    navigate(`/report/${report.id}`)
   }
 
   return (

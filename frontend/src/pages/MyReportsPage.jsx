@@ -1,21 +1,28 @@
-import { useMemo } from 'react'
+import { useState, useEffect } from 'react'
 import { useApp } from '../context/AppContext'
 import ReportCard from '../components/ReportCard'
 import FilterBar from '../components/FilterBar'
-import { getSeverityLevel } from '../utils/constants'
+import api from '../utils/api'
 
 export default function MyReportsPage() {
   const { state } = useApp()
   const isAdmin = state.currentUser?.role === 'admin'
+  const [reports, setReports] = useState([])
+  const [loading, setLoading] = useState(true)
 
-  const reports = useMemo(() => {
-    let list = isAdmin ? state.reports : state.reports.filter(r => r.citizenId === state.currentUser?.id)
-    if (state.filters.type) list = list.filter(r => r.issueType === state.filters.type)
-    if (state.filters.status) list = list.filter(r => r.status === state.filters.status)
-    if (state.filters.ward) list = list.filter(r => r.ward === state.filters.ward)
-    if (state.filters.severity) list = list.filter(r => getSeverityLevel(r.severityScore) === state.filters.severity)
-    return list.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt))
-  }, [state.reports, state.filters, state.currentUser, isAdmin])
+  useEffect(() => {
+    setLoading(true)
+    const filters = {}
+    if (state.filters.type) filters.type = state.filters.type
+    if (state.filters.status) filters.status = state.filters.status
+    if (state.filters.ward) filters.ward = state.filters.ward
+    if (state.filters.severity) filters.severity = state.filters.severity
+
+    api.reports.list(filters)
+      .then(setReports)
+      .catch(() => setReports([]))
+      .finally(() => setLoading(false))
+  }, [state.filters])
 
   return (
     <div className="space-y-5 animate-fade-in">
@@ -31,7 +38,12 @@ export default function MyReportsPage() {
 
       <FilterBar />
 
-      {reports.length === 0 ? (
+      {loading ? (
+        <div className="text-center py-16 glass-card">
+          <span className="w-8 h-8 border-3 border-civic-200 border-t-civic-500 rounded-full animate-spin inline-block" />
+          <p className="text-surface-500 mt-3 font-medium">Loading reports...</p>
+        </div>
+      ) : reports.length === 0 ? (
         <div className="text-center py-16 glass-card animate-fade-in-up">
           <span className="text-5xl mb-4 inline-block">📋</span>
           <p className="text-surface-500 font-medium">No reports found</p>

@@ -1,16 +1,52 @@
+import { useState, useEffect } from 'react'
 import { useParams, Link } from 'react-router-dom'
 import { useApp } from '../context/AppContext'
 import { ISSUE_TYPES, DEPARTMENTS, ISSUE_TO_DEPARTMENT, STATUSES } from '../utils/constants'
 import SeverityBadge from '../components/SeverityBadge'
 import StatusTimeline from '../components/StatusTimeline'
 import ComplaintPreview from '../components/ComplaintPreview'
+import api from '../utils/api'
 
 const NEXT_STATUS = { submitted: 'verified', verified: 'assigned', assigned: 'in_progress', in_progress: 'resolved' }
 
 export default function ReportDetailPage() {
   const { id } = useParams()
-  const { state, dispatch } = useApp()
-  const report = state.reports.find(r => r.id === id)
+  const { state } = useApp()
+  const [report, setReport] = useState(null)
+  const [loading, setLoading] = useState(true)
+  const [updating, setUpdating] = useState(false)
+
+  useEffect(() => {
+    setLoading(true)
+    api.reports.get(id)
+      .then(setReport)
+      .catch(() => setReport(null))
+      .finally(() => setLoading(false))
+  }, [id])
+
+  const advanceStatus = async () => {
+    if (!report || updating) return
+    const next = NEXT_STATUS[report.status]
+    if (!next) return
+    setUpdating(true)
+    try {
+      const updated = await api.reports.updateStatus(report.id, next)
+      setReport(updated)
+    } catch (err) {
+      alert(err.message || 'Failed to update status')
+    } finally {
+      setUpdating(false)
+    }
+  }
+
+  if (loading) {
+    return (
+      <div className="text-center py-20 animate-fade-in">
+        <span className="w-8 h-8 border-3 border-civic-200 border-t-civic-500 rounded-full animate-spin inline-block" />
+        <p className="text-surface-500 mt-3 font-medium">Loading report...</p>
+      </div>
+    )
+  }
 
   if (!report) {
     return (
@@ -27,20 +63,6 @@ export default function ReportDetailPage() {
   const type = ISSUE_TYPES[report.issueType] || { icon: '📋', label: report.issueType }
   const deptKey = ISSUE_TO_DEPARTMENT[report.issueType] || 'municipal'
   const dept = DEPARTMENTS[deptKey]
-
-  const advanceStatus = () => {
-    const next = NEXT_STATUS[report.status]
-    if (!next) return
-    const newHistory = [...(report.statusHistory || []), {
-      status: next,
-      timestamp: new Date().toISOString(),
-      note: `Status updated to ${STATUSES[next].label}`
-    }]
-    dispatch({
-      type: 'UPDATE_REPORT',
-      payload: { id: report.id, status: next, statusHistory: newHistory, updatedAt: new Date().toISOString() }
-    })
-  }
 
   return (
     <div className="max-w-3xl mx-auto space-y-6 animate-fade-in-up">
@@ -62,10 +84,10 @@ export default function ReportDetailPage() {
         <StatusTimeline currentStatus={report.status} statusHistory={report.statusHistory} />
       </div>
 
-      {state.currentUser.role === 'admin' && report.status !== 'resolved' && (
-        <button onClick={advanceStatus}
-          className="w-full gradient-btn py-3.5 text-base animate-scale-in">
-          Advance to: {STATUSES[NEXT_STATUS[report.status]]?.label}
+      {state.currentUser?.role === 'admin' && report.status !== 'resolved' && (
+        <button onClick={advanceStatus} disabled={updating}
+          className="w-full gradient-btn py-3.5 text-base animate-scale-in disabled:opacity-60">
+          {updating ? 'Updating...' : `Advance to: ${STATUSES[NEXT_STATUS[report.status]]?.label}`}
         </button>
       )}
 
@@ -88,10 +110,10 @@ export default function ReportDetailPage() {
         </div>
       </div>
 
-      {report.photoData && (
+      {(report.photoUrl || report.photoData) && (
         <div className="glass-card p-5">
           <h3 className="text-[10px] text-surface-400 uppercase font-semibold tracking-wider mb-3">Photo Evidence</h3>
-          <img src={report.photoData} alt="Issue" className="w-full max-h-64 object-contain rounded-xl" />
+          <img src={report.photoUrl || report.photoData} alt="Issue" className="w-full max-h-64 object-contain rounded-xl" />
         </div>
       )}
 
