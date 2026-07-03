@@ -10,9 +10,13 @@ import LeaderboardPage from './pages/LeaderboardPage'
 
 export default function App() {
   return (
-    <div className="min-h-screen bg-gray-950">
+    <div className="min-h-screen bg-gradient-to-br from-surface-50 via-white to-civic-50/30 relative">
+      <div className="fixed inset-0 -z-10 overflow-hidden pointer-events-none">
+        <div className="absolute -top-40 -right-40 w-[500px] h-[500px] bg-civic-100/40 rounded-full blur-3xl" />
+        <div className="absolute -bottom-40 -left-40 w-[500px] h-[500px] bg-emerald-100/30 rounded-full blur-3xl" />
+      </div>
       <Navbar />
-      <main className="container mx-auto px-4 py-6">
+      <main className="container mx-auto px-4 py-8 max-w-7xl">
         <Routes>
           <Route path="/" element={<HomePage />} />
           <Route path="/report" element={<ReportIssuePage />} />

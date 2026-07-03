@@ -11,7 +11,7 @@ export default function HeatmapLayer({ reports = [] }) {
           pathOptions={{
             color: 'transparent',
             fillColor: getSeverityColor(r.severityScore),
-            fillOpacity: 0.15,
+            fillOpacity: 0.12,
           }}
         />
       ))}

@@ -16,12 +16,12 @@ export default function VoiceInput({ onTranscript }) {
 
   return (
     <button type="button" onClick={toggle}
-      className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all ${
+      className={`flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-semibold transition-all duration-300 transform active:scale-95 ${
         isListening
-          ? 'bg-red-600 text-white animate-pulse'
-          : 'bg-gray-800 hover:bg-gray-700 text-gray-300'
+          ? 'bg-gradient-to-r from-red-500 to-rose-500 text-white shadow-lg shadow-red-200 animate-pulse-glow'
+          : 'bg-surface-100 hover:bg-surface-200 text-surface-600 border border-surface-200 hover:border-civic-300'
       }`}>
-      <span>{isListening ? '🔴' : '🎤'}</span>
+      <span className="text-lg">{isListening ? '🔴' : '🎤'}</span>
       {isListening ? 'Stop Recording' : 'Voice Input'}
     </button>
   )

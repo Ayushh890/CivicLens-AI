@@ -11,27 +11,27 @@ function ChangeView({ center, zoom }) {
 export default function MapView({ reports = [], center = [28.6139, 77.2090], zoom = 12, height = '500px', onMarkerClick }) {
   return (
     <MapContainer center={center} zoom={zoom} style={{ height, width: '100%' }}
-      className="rounded-xl z-0">
+      className="rounded-2xl z-0">
       <ChangeView center={center} zoom={zoom} />
       <TileLayer
-        url="https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png"
+        url="https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png"
         attribution='&copy; <a href="https://carto.com">CARTO</a>'
       />
       {reports.map(r => (
         <CircleMarker key={r.id}
           center={[r.latitude, r.longitude]}
-          radius={r.severityScore >= 76 ? 10 : r.severityScore >= 51 ? 8 : 6}
+          radius={r.severityScore >= 76 ? 12 : r.severityScore >= 51 ? 9 : 7}
           fillColor={getSeverityColor(r.severityScore)}
-          color={getSeverityColor(r.severityScore)}
-          fillOpacity={0.7}
+          color="white"
+          fillOpacity={0.8}
           weight={2}
           eventHandlers={{ click: () => onMarkerClick?.(r) }}>
           <Popup>
             <div className="min-w-[200px]">
-              <p className="font-semibold text-sm mb-1">{ISSUE_TYPES[r.issueType]?.icon} {r.title}</p>
+              <p className="font-bold text-sm mb-1 text-surface-800">{ISSUE_TYPES[r.issueType]?.icon} {r.title}</p>
               <SeverityBadge score={r.severityScore} />
-              <p className="text-xs text-gray-400 mt-1">{r.address}</p>
-              <p className="text-xs text-gray-500 mt-1">{r.id} | {r.status}</p>
+              <p className="text-xs text-surface-500 mt-1">{r.address}</p>
+              <p className="text-xs text-surface-400 mt-1 font-mono">{r.id} | {r.status}</p>
             </div>
           </Popup>
         </CircleMarker>

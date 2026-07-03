@@ -4,9 +4,10 @@ import { ISSUE_TYPES, SEVERITY_LEVELS, STATUSES, WARDS } from '../utils/constant
 export default function FilterBar() {
   const { state, dispatch } = useApp()
   const set = (key, value) => dispatch({ type: 'SET_FILTERS', payload: { [key]: value } })
+  const hasFilters = state.filters.type || state.filters.severity || state.filters.status || state.filters.ward
 
   return (
-    <div className="flex flex-wrap gap-2">
+    <div className="flex flex-wrap gap-2 animate-fade-in">
       <Select value={state.filters.type} onChange={v => set('type', v)} placeholder="All Types"
         options={Object.entries(ISSUE_TYPES).map(([k, v]) => ({ value: k, label: `${v.icon} ${v.label}` }))} />
       <Select value={state.filters.severity} onChange={v => set('severity', v)} placeholder="All Severity"
@@ -15,10 +16,10 @@ export default function FilterBar() {
         options={Object.entries(STATUSES).map(([k, v]) => ({ value: k, label: v.label }))} />
       <Select value={state.filters.ward} onChange={v => set('ward', v)} placeholder="All Wards"
         options={WARDS.map(w => ({ value: w, label: w }))} />
-      {(state.filters.type || state.filters.severity || state.filters.status || state.filters.ward) && (
+      {hasFilters && (
         <button onClick={() => dispatch({ type: 'CLEAR_FILTERS' })}
-          className="px-3 py-1.5 text-xs text-red-400 hover:text-red-300 bg-gray-800 rounded-lg">
-          Clear
+          className="px-4 py-2 text-xs font-medium text-red-500 hover:text-red-600 bg-red-50 hover:bg-red-100 rounded-xl border border-red-200 transition-all duration-300 active:scale-95">
+          Clear All
         </button>
       )}
     </div>
@@ -28,7 +29,7 @@ export default function FilterBar() {
 function Select({ value, onChange, placeholder, options }) {
   return (
     <select value={value} onChange={e => onChange(e.target.value)}
-      className="px-3 py-1.5 bg-gray-800 border border-gray-700 rounded-lg text-sm text-white focus:outline-none focus:border-civic-500">
+      className="px-4 py-2 bg-white border border-surface-200 rounded-xl text-sm text-surface-700 focus:outline-none focus:border-civic-400 focus:ring-2 focus:ring-civic-100 transition-all duration-300 cursor-pointer hover:border-civic-300">
       <option value="">{placeholder}</option>
       {options.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
     </select>
