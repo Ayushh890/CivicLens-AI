@@ -1,26 +1,41 @@
 import { createContext, useContext, useReducer, useEffect } from 'react'
 import { generateMockReports } from '../utils/mockData'
 import { detectPatterns } from '../utils/predictionEngine'
+import { getSession, logout as authLogout } from '../utils/authService'
 
 const AppContext = createContext(null)
 
-const DEFAULT_USER = { id: 'CIT-001', name: 'Rahul Sharma', role: 'citizen' }
-
 function loadState() {
+  const session = getSession()
+
   try {
     const saved = localStorage.getItem('civiclens_state')
     if (saved) {
       const parsed = JSON.parse(saved)
-      return { ...initialState, ...parsed, predictions: detectPatterns(parsed.reports || []) }
+      return {
+        ...initialState,
+        ...parsed,
+        currentUser: session,
+        isAuthenticated: !!session,
+        predictions: detectPatterns(parsed.reports || []),
+      }
     }
   } catch {}
+
   const reports = generateMockReports()
-  return { ...initialState, reports, predictions: detectPatterns(reports) }
+  return {
+    ...initialState,
+    reports,
+    currentUser: session,
+    isAuthenticated: !!session,
+    predictions: detectPatterns(reports),
+  }
 }
 
 const initialState = {
   reports: [],
-  currentUser: DEFAULT_USER,
+  currentUser: null,
+  isAuthenticated: false,
   filters: { type: '', severity: '', status: '', ward: '' },
   predictions: [],
   notification: null,
@@ -28,6 +43,12 @@ const initialState = {
 
 function appReducer(state, action) {
   switch (action.type) {
+    case 'LOGIN':
+      return { ...state, currentUser: action.payload, isAuthenticated: true }
+    case 'LOGOUT': {
+      authLogout()
+      return { ...state, currentUser: null, isAuthenticated: false }
+    }
     case 'ADD_REPORT':
       return { ...state, reports: [action.payload, ...state.reports], predictions: detectPatterns([action.payload, ...state.reports]) }
     case 'UPDATE_REPORT': {
@@ -38,8 +59,6 @@ function appReducer(state, action) {
       return { ...state, filters: { ...state.filters, ...action.payload } }
     case 'CLEAR_FILTERS':
       return { ...state, filters: { type: '', severity: '', status: '', ward: '' } }
-    case 'TOGGLE_ROLE':
-      return { ...state, currentUser: { ...state.currentUser, role: state.currentUser.role === 'citizen' ? 'admin' : 'citizen' } }
     case 'SET_NOTIFICATION':
       return { ...state, notification: action.payload }
     case 'CLEAR_NOTIFICATION':
@@ -53,7 +72,7 @@ export function AppProvider({ children }) {
   const [state, dispatch] = useReducer(appReducer, null, loadState)
 
   useEffect(() => {
-    const { predictions, notification, ...toSave } = state
+    const { predictions, notification, isAuthenticated, currentUser, ...toSave } = state
     localStorage.setItem('civiclens_state', JSON.stringify(toSave))
   }, [state])
 
