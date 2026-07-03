@@ -1,0 +1,16 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  body { @apply antialiased; }
+  ::-webkit-scrollbar { width: 6px; }
+  ::-webkit-scrollbar-track { @apply bg-gray-900; }
+  ::-webkit-scrollbar-thumb { @apply bg-gray-700 rounded-full; }
+}
+
+.leaflet-container { background: #0a0a0a !important; }
+.leaflet-popup-content-wrapper { @apply bg-gray-800 text-white rounded-lg shadow-xl; }
+.leaflet-popup-tip { background: #1f2937; }
+.leaflet-popup-content { margin: 12px; }
+.leaflet-control-zoom a { @apply bg-gray-800 text-white border-gray-700; }
